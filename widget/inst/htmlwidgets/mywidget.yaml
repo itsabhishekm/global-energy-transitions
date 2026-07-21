@@ -1,0 +1,12 @@
+# (uncomment to add a dependency)
+# dependencies:
+#  - name:
+#    version:
+#    src:
+#    script:
+#    stylesheet:
+  dependencies:
+    - name: mywidget
+      version: 1.0
+      src: htmlwidgets
+      stylesheet: mywidget.css

@@ -1,0 +1,609 @@
+---
+title: "Project 2 - Energy capacity across the world"
+subtitle: "INFO 526 - Spring 2025 - Project 02"
+author: 
+  - name: "Global Renewable Energy Transitions"
+    affiliations:
+      - name: "College of Information Science, University of Arizona"
+description: "This project centers on the analysis of changes in the max renewable energy capacity of countries across the world, ending with an interactive 3D Globe that calls for users to explore at their own pace."
+format:
+   html:
+    code-tools: true
+    code-overflow: wrap
+    embed-resources: true
+editor: visual
+execute:
+  warning: false
+  echo: false
+---
+
+## Abstract
+
+We characterize the growth in max capacity of renewable energy across the world using a 3D interactive globe that lets us tell a story in a novel way and invites readers to try and find their own by giving them various controls to color the globe according to different criteria. We provide them a guide they can follow that presents our main insights with regards to the growth over the years for solar energy in different regions through a Story Drawer containing our narration.
+
+## Introduction
+
+Renewable energy has steadily grown in the past years, as we found in “Data Page: Installed capacity for different renewable technologies” by Our World In Data (2025), which shows a base trend of growth in renewable energies, with solar and hydropower at the top, and wind following in third place. However, this data is presented just as a worldwide summary, and we wished to see a more detailed characterization that included which parts of the world are contributing towards a more sustainable future, and in what way. Our purpose then is to bridge this gap, performing some analysis and creating an interactive tool for users to be able to explore at their leisure, with a bit of a guiding hand from us. To that end, International Renewable Energy Agency (IRENA)’s “Renewable capacity statistics 2025” (2025), which is the source that Our World in Data (2025) uses, presents an executive summary and an excel file with the “Electricity Installed Capacity” in Megawatts, in which each country is listed with their capacity per year.
+
+Our analysis will focus on looking at how countries have expanded their renewable energy capacity over the years, first starting at a continent level with some interactive graphs, and then progressing to the country level through the use of an interactive 3D globe that serves as both an analysis medium and as a tool to let users freely explore and find their own stories. For the purposes of this project, we will provide a guided analysis only on the predominant renewable energy. However, the tool may provide additional parameters for exploration, letting users roam freely.
+
+The next layer of implementation of our project touches upon exploring solar potential across various countries by merging solargis dataset (World Bank Group et al., 2023), IRENA data-set and geojson obtained from Natural Earth, this is a crucial part of our story telling as it gives a complete picture about which parts of world are showing growth in solar energy, why(understand impact of geography and other factors) and where the future potential could be. Various practical questions and interesting patterns could be observed and answered from this exploration and we were eager to find what story we discover here.
+
+One motivating factor for choosing an interactive tool is that maybe interactivity tools can help users engage with the data. Though a different subject that we carefully state we are not conflating entirely with this case, Oh et al. (2018) found some effect with a highly interactive narrative, together with an interactive data visualization, although they explicitly state it must be in both. Perdana et al. (2018) in a business context found interactive data visualizations to make their participants “more heuristically adept”. Thus we are curious to explore the use of an interactive element, both from this perspective and from a learning perspective.
+
+## Analysis
+
+### Question 1
+
+```{r Required Libraries for the project, message=FALSE, warning=FALSE}
+library(readxl)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(janitor)
+library(plotly)
+```
+
+```{r Question 1 Part 1, message=FALSE, warning=FALSE}
+# Load and clean column names using janitor
+global_data <- read_excel("data/irena_stats.xlsx", sheet = "Global") %>%
+  janitor::clean_names()
+
+
+
+# Rename columns for clarity
+global_data <- global_data %>%
+  rename(
+    group = re_or_non_re,
+    capacity_mw = sum_of_electricity_installed_capacity_mw
+  )
+
+year_group_summary <- global_data %>%
+  group_by(year, group) %>%
+  summarise(total_capacity_mw = sum(capacity_mw, na.rm = TRUE), .groups = "drop")
+
+year_group_summary <- year_group_summary %>% 
+  filter(!is.na(year))
+
+p1 <- ggplot(year_group_summary, 
+             aes(x = year, y = total_capacity_mw / 1000, color = group, group = group,
+                 text = paste0("Year: ", year, 
+                               "<br>Capacity: ", round(total_capacity_mw / 1000, 2), " GW"))) +
+  geom_line(size = 0.8) +
+  labs(
+    title = "Installed Capacity Over Time: Renewable vs Non-Renewable",
+    x = "Year",
+    y = "Installed Capacity (GW)",
+    color = "Energy Type"
+  ) +
+  theme_minimal()
+ggplotly(p1, tooltip = "text")
+```
+
+```{r Question 1 Part 1}
+growth_summary <- global_data %>%
+  filter(year %in% c(2000, 2024)) %>%
+  group_by(group, year) %>%
+  summarise(capacity_mw = sum(capacity_mw, na.rm = TRUE), .groups = "drop") %>% 
+  pivot_wider(names_from = year, values_from = capacity_mw, names_prefix = "year_") %>% 
+  mutate(
+    absolute_growth = year_2024 - year_2000,
+    percentage_growth = (year_2024 - year_2000) / year_2000 * 100
+  )
+
+growth_summary
+```
+
+```{r Question 1 Part 2, message=FALSE, warning=FALSE, fig.height=10}
+
+p2 <- ggplot(global_data %>% filter(group == "Total Renewable" & !is.na(year)),
+             aes(x = year, y = capacity_mw / 1000, fill = group_technology,
+                 text = paste0("Year: ", year,
+                               "<br>Technology: ", group_technology,
+                               "<br>Capacity: ", round(capacity_mw / 1000, 2), " GW"))) +
+  geom_col(position = position_dodge2()) +
+  labs(
+    title = "Installed Capacity by Renewable Technology Over Time",
+    x = "Year",
+    y = "Installed Capacity (GW)",
+    fill = "Technology"
+  ) +
+  theme_minimal()
+ggplotly(p2, tooltip = "text")
+```
+
+```{r Question 1 Part 2, warning=FALSE, message=FALSE}
+tech_growth <- global_data %>%
+  filter(group == "Total Renewable", year %in% c(2000, 2024)) %>%
+  group_by(group_technology, year) %>%
+  summarise(capacity_mw = sum(capacity_mw, na.rm = TRUE), .groups = "drop") %>%
+  pivot_wider(names_from = year, values_from = capacity_mw, names_prefix = "year_") %>%
+  mutate(
+    absolute_growth = year_2024 - year_2000,
+    percentage_growth = (year_2024 - year_2000) / year_2000 * 100
+  )
+
+tech_growth
+
+p5 <- ggplot(tech_growth, aes(x = reorder(group_technology, absolute_growth), y = absolute_growth / 1000,
+                              fill = group_technology,
+                              text = paste0("Technology: ", group_technology,
+                                            "<br>Absolute Growth: ", round(absolute_growth / 1000, 2), " GW"))) +
+  geom_col() +
+  coord_flip() +
+  labs(
+    title = "Absolute Growth of Renewable Technologies (2000 to 2024)",
+    x = "Technology",
+    y = "Absolute Growth (GW)",
+    fill = "Technology"
+  ) +
+  theme_minimal()
+
+ggplotly(p5, tooltip = "text")
+```
+
+```{r}
+# Fit models and predict for actual years
+model_actual <- year_group_summary %>%
+  group_by(group) %>%
+  do({
+    model <- if (unique(.$group) == "Total Renewable") {
+      lm(total_capacity_mw ~ poly(year, 2), data = .)
+    } else {
+      lm(total_capacity_mw ~ year, data = .)
+    }
+    preds <- predict(model, newdata = ., interval = "confidence")
+    bind_cols(., as.data.frame(preds))
+  }) %>%
+  ungroup() %>%
+  mutate(text = paste0("Year: ", year,
+                       "<br>Type: ", group,
+                       "<br>Fitted: ", round(fit / 1000, 2), " GW",
+                       "<br>95% CI: [", round(lwr / 1000, 2), ", ", round(upr / 1000, 2), "]"))
+
+p3 <- ggplot(model_actual, aes(x = year)) +
+  geom_point(aes(y = total_capacity_mw / 1000, color = group), size = 2) +
+  geom_line(aes(y = fit / 1000, color = group)) +
+  geom_ribbon(aes(ymin = lwr / 1000, ymax = upr / 1000, fill = group), alpha = 0.2, color = NA) +
+  geom_point(aes(y = fit / 1000, color = group, text = text), shape = 21, size = 2, stroke = 0.3) +
+  labs(
+    title = "Installed Capacity with Model Fit (95% CI)",
+    x = "Year",
+    y = "Installed Capacity (GW)",
+    color = "Energy Type",
+    fill = "95% CI"
+  ) +
+  theme_minimal()
+ggplotly(p3, tooltip = "text")
+```
+
+```{r warning=FALSE}
+
+# Create full years: from min actual year to 11 years ahead - till 2035 basically
+full_years <- tibble(year = seq(min(year_group_summary$year), 2035))
+model_full <- year_group_summary %>%
+  group_by(group) %>%
+  do({
+    model <- if (unique(.$group) == "Total Renewable") {
+      lm(total_capacity_mw ~ poly(year, 2), data = .)
+    } else {
+      lm(total_capacity_mw ~ year, data = .)
+    }
+    preds <- predict(model, newdata = full_years, interval = "confidence")
+    bind_cols(full_years, as.data.frame(preds)) %>%
+      mutate(group = unique(.$group))
+  }) %>%
+  ungroup() %>%
+  mutate(text = paste0("Year: ", year,
+                       "<br>Type: ", group,
+                       "<br>Fitted: ", round(fit / 1000, 2), " GW",
+                       "<br>95% CI: [", round(lwr / 1000, 2), ", ", round(upr / 1000, 2), "]"))
+
+max_actual_year <- max(year_group_summary$year)
+
+p4 <- ggplot() +
+  geom_point(data = year_group_summary, aes(x = year, y = total_capacity_mw / 1000, color = group), size = 2) +
+  geom_line(data = model_full, aes(x = year, y = fit / 1000, color = group)) +
+  geom_ribbon(data = model_full, aes(x = year, ymin = lwr / 1000, ymax = upr / 1000, fill = group), alpha = 0.2) +
+  geom_point(data = model_full %>% filter(year > max_actual_year),
+             aes(x = year, y = fit / 1000, color = group, text = text), shape = 21, size = 2, stroke = 0.3) +
+  labs(
+    title = "Forecast of Installed Capacity to 2035 with 95% CI",
+    x = "Year",
+    y = "Installed Capacity (GW)",
+    color = "Energy Type",
+    fill = "95% CI"
+  ) +
+  theme_minimal()
+ggplotly(p4, tooltip = "text")
+
+
+```
+
+#### Discussion
+
+The analysis of global installed energy capacity from 2000 to 2024 reveals a striking contrast in the growth trajectories of renewable and non-renewable sources. While non-renewables have maintained a steady and relatively linear increase, the expansion of renewable energy has been exponential, particularly in the past decade. Forecasting models project that renewable capacity will surpass non-renewable capacity before 2030, signaling a major shift in global energy infrastructure and policy priorities. This crossover point is clearly visible in the projection graphs, where the renewable intersects and overtakes the non-renewable one between 2029 and 2030.
+
+When broken apart by technology, solar and wind energy emerge as the leading contributors to renewable capacity growth. Solar energy grew from approximately 1.1 GW in 2000 to 1,865.5 GW in 2024, representing an extraordinary absolute growth of over 1,864 GW, and a percentage increase of more than 168,000%. Wind energy followed closely, expanding from 16.96 GW to 1,132.8 GW, yielding a growth rate of around 6,579%. In contrast, hydropower despite being a mature and widely used technology in 2000s, exhibited only moderate growth, increasing from 702.5 GW to 1,283 GW (about 82.6% growth). Bioenergy showed the smallest increase in absolute terms, growing by roughly 120.9 GW, or 405%, over the same period.
+
+Overall, total renewable energy capacity increased by approximately 3,681 GW during the 25-year period, compared to 2,356 GW for non-renewables. In relative terms, this translates to a 490% growth in renewable capacity versus an 86% increase for non-renewables. This dramatic disparity in growth rates shows the accelerating momentum behind the global energy transition. Importantly, while non-renewables still account for a significant portion of global installed capacity, their growth appears to be driven by energy needs necessity of the world, while renewables growth showcase the clear policy change and driven not only by energy needs but also to align by climate goals.
+
+These patterns indicate that renewable energy is no longer supplementary but a rapidly increasing and becoming central to global energy generation systems. The results highlight the importance of continuing to monitor and model these shifts to inform both international policy and energy strategies.
+
+### Question 2
+
+## Introduction
+
+-   In Question 2, we focused on identifying the most prominent renewable energy sources globally and evaluating which countries exhibited the most significant growth over time. This growth was assessed in three dimensions: cumulative capacity, absolute increase, and percentage-based change. After analyzing the data, we selected solar energy as our primary focus due to its exceptionally high percentage growth of 168,707%, making it the most rapidly expanding renewable energy source during the analysis period.
+
+-   We also then added a layer of photo voltaic potential to compare it with current solar energy trend to find the solar potential trend in correlation to the energy production across the globe.
+
+## Analysis
+
+### Preprocessing
+
+The primary data source was the IRENA dataset, from which we used fields such as country names, ISO3 codes, year, installed electricity capacity (MW), and grouped energy technology categories. To ensure consistency across the dataset, all countries were aligned on a common timeline from 2000 to 2024. Countries were then manually grouped into seven geographic regions, and this regional information was merged with the main dataset using ISO3 codes.
+
+To prepare the data for visualization, we began by aggregating and transforming it into structured JSON formats compatible with an interactive 3D globe. We summarized global and regional electricity data by calculating the highest annual values for each energy technology (e.g., solar, wind) based on raw change, total installed electricity, and year-over-year percentage growth. This information was organized hierarchically by region, energy type, property, and year, and serialized into a comparisons.json file.
+
+A similar process was applied at the country level to produce the country_performance.json file, allowing for more detailed geographic insights. In parallel, we processed solar potential data sourced from an external Excel file, cleaned it, and converted it into a solar_potential.json file mapping each country to its average practical solar irradiance.
+
+For the interactive 3D visualization, we used a combination of Shiny, HTML widgets, and Globe.GL. The system integrates R and JavaScript through mywidget.R and mywidget.js, with the main application logic housed in app.R. The globe dynamically renders energy data using a structured hierarchy organized by country, energy group, highlight property, and year. This is supported by JSON data files including countries_updated.geojson, comparisons.json, and countries_story.json.
+
+For Solar potential, we worked at the intersection of three datasets, IRENA, Solargis and Naural Earth geojson data. Keeping the geojson data as our base (as it had all the boundary information for the polygons to be rendered on our globe), we add countries with their ISO codes from IRENA datsets and their solar potential (column : "PVOUT Level 1, kWh/kWp/day), long-term) for Solargis dataset.\
+\
+This was done using R and Javascript. Javascript proved useful for quick merge of our json file(created using R) with out geojson file.
+
+### **Region Wise Analysis (Solar Energy)**
+
+#### Europe
+
+Europe’s solar energy landscape underwent a significant transformation from 2000 onwards, evolving from a Western dominated domain led by countries like Italy and Spain. By 2012, Eastern European nations such as Romania, Bulgaria, and Poland began to emerge as key players, followed by newer contributors like Russia, Estonia, and Kosovo. In the post-2020 era, smaller and more agile countries including Moldova, North Macedonia, and Lithuania demonstrated remarkable and consistent progress, highlighting a broader democratization of solar energy. This shift was fueled by national policies, declining technology costs, and strong EU support, enabling solar adoption across varying income levels and geographic regions.
+
+#### Oceania
+
+The Oceania region witnessed a remarkable growth in solar energy adoption, transitioning from a landscape dominated by Australia to a more distributed pattern of regional growth. In 2000, Australia stood far ahead with 25 MW of installed capacity, while most Pacific island nations relied on off-grid, micro-scale systems contributing capacities under 0.1 MW. By 2012, countries like Samoa (+2142.9%), Tonga (+543.7%), and Fiji (+226%) recorded striking percentage increases, though Australia maintained its leadership by adding over 1 GW. This dual trend continued through 2014 and 2016, with nations like Samoa, Niue, and Micronesia posting impressive growth rates, while Australia consistently added between 825 and 845 MW annually, crossing 5.8 GW by 2016.
+
+Between 2017 and 2019, New Caledonia emerged as a new standout, adding over 90 MW across three years, while Australia expanded by over 9.5 GW and New Zealand continued its upward trajectory. By the 2020–2024 period, Australia solidified its dominance with an additional 22 GW, reaching over 30 GW in total, while New Zealand quadrupled its capacity from 145 MW to 570 MW. Meanwhile, smaller Pacific nations led in percentage growth: Palau grew 352% in 2023, Tonga 104% in 2022, and Nauru 92.8% in 2024—highlighting increased access to solar energy across remote island states. This shift underscores a broader regional movement toward decentralized, resilient solar systems that are critical for ensuring energy access and sustainability across diverse geographies.
+
+#### Middle east and India
+
+Middle east and India's solar energy development transformed from early adoption to a large scale regional surge. Initially, countries like India Afghanistan and Israel had shown a consistent growth while countries such as Nepal, Sri Lanka, and Jordan recorded minimal capacities. By 2012, nations such as Afghanistan, Pakistan, and Saudi Arabia demonstrated exponential percentage growth, and India began to assert its leadership with significant absolute capacity increases. This trend accelerated in 2014 and 2016, with India adding over 2 GW and then 4.2 GW, while Kuwait and other emerging nations like Jordan and Azerbaijan led in growth rates. Between 2017 and 2019, India’s dominance became more pronounced, contributing over 25 GW, while countries like Israel, Jordan, and smaller nations such as Nepal, Oman, and Armenia saw consistent or high-percentage growth. From 2020 to 2024, India solidified its leadership with over 61 GW added, including a peak of 24.5 GW in 2024. Meanwhile, countries like Qatar (15,686% growth), Uzbekistan (5714%), and others including Azerbaijan, Oman, and Lebanon emerged as new clean energy frontrunners. This period reflects not only India's sustained leadership but also a broader regional shift toward clean energy, with growing participation from both large economies and smaller nations across the Middle East and Central Asia.
+
+#### Asia
+
+In 2000, Japan led Asia in solar electricity production, setting the pace for the region. By 2010, countries like China, South Korea, India, and Thailand began showing sharp increases, marking the start of rapid regional growth. While Japan's expansion slowed from 2016 onward, with annual growth dropping below 20%, other nations picked up speed. Vietnam entered the scene dramatically in 2018 with an explosive 1200% growth, though its momentum slowed after 2021. Throughout this period, South Korea stood out for its consistent progress, maintaining a steady average growth rate of around 30% per year, reflecting a balanced and reliable solar strategy.
+
+#### North America:
+
+-   2010 - Canada gains traction with a staggering 248.38% growth with respect to 2009. USA leads the race overall in North America, with a 25% average growth rate per year from 2000 till 2024.
+
+-   Mexico peaked in Megawatts energy production rate in the years 2018 and 2019 with a growth rate of around 158 and 125%,
+
+-   Dominican Re-pubic kept a high steady pace of increase since 2016, ending with 1422.58 MW of production by 2024. A large amount for such a small nation.
+
+#### South America :
+
+-   Peru starts in the lead position in the year 2000 (12.511 MW).
+
+-   2014 - Chile takes the lead by showing 1368% increase in energy production as compared to the year. The lead ends in 2018 when Brazil becomes the highest producer of solar energy.
+
+-   2017 is an interesting year for South America as various countries enter the solar energy race. Uruguay added 156.68 MW, Brazil showed a growth rate of 790.5%. Columbia showed steep increase by adding 9.8 MW (644.7% increase w.r.t 2016).
+
+-   2019 onward Columbia shows an impressive rate of 70% growth rate with respect to the previous year, adding 299 MW (169% increase) in 2022.
+
+Paraguay given it's size is much behind than it's neighbouring countries, having developed just 1.16 MW solar energy capacity by 2024.
+
+Some Interesting Analsis in Exploring Solar Potential :
+
+-   **Africa** : Namibia turned out to be of Huge, having a very potential ranking but lagging behind in energy production with respect to its neighbors.
+
+-   **Europe** : showed the most promise, as even though having low potential ranking, they have performed remarkable well in solar energy production especially Germany.\
+
+#### Africa
+
+Africa’s solar energy journey has been marked by uneven but meaningful progress, gradually shifting from marginal capacity to more significant contributions on a regional scale. In 2000, Morocco led the continent with just 6.7 MW, followed by Tunisia, Niger, Malawi, and Egypt, all under 1 MW. Solar adoption at the time was negligible on a global scale. By 2010, Morocco had made substantial progress, increasing to over 100 MW—a 274% jump from the previous year while countries like Algeria (25 MW), Egypt (15 MW), and Senegal (14 MW) also began to emerge. In 2012, Egypt surged to 70 MW, nearing Morocco’s 105 MW, with Algeria and South Africa close behind. However, 2014 marked a turning point as South Africa became the clear regional leader, reaching 3.49 GW and creating a stark contrast with the rest of the continent. While raw numbers showed disparity, percentage based visualizations highlighted growing participation across many smaller nations.
+
+In 2016, South Africa nearly doubled its capacity from two years prior, reaching 6.5 GW, while Algeria and Morocco also grew significantly. By 2017, Egypt began a steady rise, expanding from 177 MW in 2016 to over 7.7 GW by 2024. South Africa continued to dominate, growing from 6.5 GW in 2016 to over 20 GW in 2024. Despite remaining small on a global scale, numerous African countries showed intermittent growth across this period, with varying contributions year over year. While Africa’s capacity often appeared modest globally, a closer regional lens reveals a continent focused on solar adoption.
+
+## Discussion
+
+From 2000 to 2024, the world saw big changes in how solar energy was used. As the cost of solar technology dropped and more countries created clean energy plans, solar power started growing in every part of the world. Some countries led with large-scale projects, while others made steady progress even with limited resources. This shows that solar energy is becoming a global effort.
+
+In Europe, early progress came from Western countries like Italy and Spain. But after 2012, many Eastern and smaller countries also started growing their solar capacity, thanks to strong support from the European Union. These changes show how policies and teamwork across countries helped spread solar power more evenly.
+
+Asia grew rapidly. Japan and China led in the early years, with China and India soon becoming the biggest player, adding huge amounts of solar power every year. At the same time, countries like Afghanistan, Uzbekistan, and Pakistan made large gains in percentage growth, even though their total capacity was smaller. This shows that solar power is reaching more places, not just the biggest economies.
+
+In the Oceania, Africa, and the Americas, each region had its own path. Australia stayed far ahead in the Pacific, but island nations like Samoa and Palau made big improvements from very small beginnings. In Africa, South Africa and Egypt took the lead, while many other countries slowly increased their use of solar energy. In the Americas, the U.S. remained the top country in total solar power, but smaller countries like Suriname, Haiti, and El Salvador led in percentage growth, showing that solar energy is spreading to more parts of the region.
+
+On comparing the world shift from 2000 to 2024 we can observe that world have shifted from limited, scattered solar adoption to a global clean energy. Solar power grew from megawatts to gigawatts, with major growth in Asia, especially China and India and also the smaller nations across all regions began to embrace solar, showing wide access and participation.What began as experimentation is now a key part of global energy strategies and climate goals.
+
+## Technical Dive
+
+This section aims to provide insight into the creation of our interactive 3D globe, since it required extensive coding and consulting of sources throughout the process. We explain the key implementation decisions and the tools and references used.
+
+For the creation of an interactive 3D globe, we started with an exploration of existing tools. We found “globe.gl”, “HTMLWidgets”, and “Shiny” as the core stack. We then used the library examples presented in “Globe.GL. UI component for Globe Data Visualization using ThreeJS/WebGL” (n.d.), which links to the “globe.gl” repository (Asturiano, 2025), particularly the example for choropleth (see “globe.gl/example/choropleth-countries/index.html”) and the example for highlighting (see “globe.gl/example/airline-routes/highlight-links.html”) as the base code for implementation, although we made modifications to use our data.
+
+As a disclosure, we also did a manual search for a tool that allowed us to create a globe, and through Hoare (2025) we wound up finding “rthreejs” (Lewis, 2025), which has an annexed website (Lewis, n.d.) with examples for creation of 3D globes. It is a tool that seemed more limited and complex to use than Globe.GL. As such we preferred the latter, which additionally provided a variety of examples, some doing exactly what we needed.
+
+For the HTMLWidget implementation, we used “Creating a Widget” (n.d.) as a guiding resource, which is in essence a tutorial for using HTMLWidgets. For Shiny, we used the book “Mastering Shiny” for some base elements. Prior work experience with websockets and JavaScript also came in handy throughout development.
+
+### How it works: Shiny, HTMLWidgets, and Globe.GL
+
+Our understanding of it comes from “Creating a Widget” (n.d.). In essence, we want to run an interactive 3D globe. Globe.GL is a Javascript component, so we need to run JavaScript as well. Both elements point towards using Shiny so that we can serve some HTML with JavaScript. That’s where HTMLWidgets comes in: it lets us tell Shiny to load an HTMLWidget as a library and create a component. The following figure makes the process clear.
+
+![](images/clipboard-1437939708.png)
+
+#### Integrating Globe.gl in JavaScript
+
+We started with Asturiano’s (2025) “example/choropleth-countries/index.html” file, which is showing us the globe.gl API and the code to load a choropleth map. We left the code mostly as-is, adapting the label and the function that decides the choropleth scale.
+
+![](images/clipboard-362746356.png)
+
+It also includes the function to color, which is being used here with GDP and population; properties that came in the geojson file already. However, for our purposes, we adapted this same function to other properties we were interested in such as the percentage of growth, the net change with respect to the last year, or the total electricity capacity. Note that the function is simply a fraction, so it’s quite intuitive to understand and adapt.
+
+![](images/clipboard-1296193080.png)
+
+The imports are quite tricky, and because HTMLWidget’s dependency system was limiting, we instead import the JavaScript libraries needed using a custom async function that awaits all scripts to load. We already knew this pattern was possible from prior work experience and implemented it accordingly.
+
+![](images/clipboard-4235872757.png)
+
+#### Passing the data to renderValue: mywidget.R as the HTMLWidget bridge
+
+HTMLWidget creates a special JavaScript file that has a function called “renderValue”, which is the function that is run when the widget is started. As such, all our code is within this part; renderValue can also be made to receive parameters, as seen in “Creating a widget” (n.d.). We adapted said article’s code to instead send the JSON that we need, since we had trouble making the JavaScript fetch it. You can see in mywidget.js, in lines 39-55 that we try to get these JSON files.
+
+![](images/clipboard-3495366599.png)
+
+That means Shiny must send these to this mywidget.js, but there’s a middleman to disclose: “mywidget.R”. That is, the bridge between Shiny and creating a globe in JavaScript is that HTMLWidget will create a widget. Shiny needs to call a function that we define in mywidget.R:
+
+![](images/clipboard-2579013499.png)
+
+We also need to create some handlers for Shiny specifically, since an HTMLWidget could technically create a package that is run without it being run in Shiny. In our “mywidget.R” file, I followed the “Creating a Widget” (n.d.) article to add the Shiny handles.
+
+![](images/clipboard-1700255322.png)
+
+Hopefully, the following diagram helps clear up how the data transfer happens.
+
+![](images/clipboard-118245440.png)
+
+#### Using the mywidget.R function and shiny adapters in Shiny: Compile and load.
+
+These three functions serve as Shiny adapters — one runs in the server and the other in the UI, rendering the HTMLWidget.
+
+![](images/clipboard-3861155162.png)
+
+The HTMLWidget must be compiled as a package. “Creating a widget” (n.d.) covers the use of “devtools::install()”, though in practice running “devtools::build()” first before “devtools::install()” consistently gave better results. Once built, the library (ours is called “P2A1”) can be loaded in Shiny alongside the three functions described above.
+
+![](images/clipboard-48772023.png)
+
+### Switches and Levers: Globe.GL controls
+
+Now let’s talk about the globe functions. We worked through the Globe.GL API to handle controls such as re-rendering, callback behavior, and dynamically appending child elements. We have named the sections in the code to help give some consistency to the code, and provide explanations for them below.
+
+#### Section: Setup setting variables that may be modified and Section: Point of View
+
+The way that our controls work is that we always keep the current state in variables that are attached to the window (e.g. window.currentStory, window.currentRegionIndex).
+
++--------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| **Variable**                   | **Purpose**                                                                                                                                                                                                                                                                                                                                                                                                            |
++--------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| globePTO                       | The Globe.GL globe instance. We affix it to the window (so it's actually accessed via window.globePTO) so that it is readily available.                                                                                                                                                                                                                                                                                |
++--------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| countries                      | This geojson is the object that is used to display the Choropleth map. It contains bounding boxes, but also the properties we need; it was created through a preprocessing script and some JavaScript functions.                                                                                                                                                                                                       |
++--------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| countries_story                | In this variable we load the hand-crafted JSON with the stories for the Solar Energy globe. We made this by analyzing the regions throughout the years and writing down things of interest to guide the user through.                                                                                                                                                                                                  |
++--------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| maxLimits                      | This object is used to set the denominator for the Choropleth Value; the Max. For each year, one country must be the highest for its region, and one country must be the highest worldwide. Choosing the regional value lets you see a more local ranking of countries, while worldwide usually results in many countries paling in comparison, but it can also show you if a country is relevant at a worldwide scale |
++--------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| currentQuestion                | Either “1” or “2”, we use it to know which panel should be shown. We just use a simple CSS trick to hide and display, by changing “display: block” to “display: none” and vice versa using a JavaScript function                                                                                                                                                                                                       |
++--------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| currentStory                   | Points to the current renewable energy being shown in the globe, such as “solar” or “wind”                                                                                                                                                                                                                                                                                                                             |
++--------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| currentRegion                  | Points to the current region being focused on the map. There are 7 regions, picked based on strategic points where we can look at related countries without repeating too many of them.                                                                                                                                                                                                                                |
++--------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| currentRegionPointer           | Same as the above, but instead of being a string, it is a number from 0 to 6. They always match.                                                                                                                                                                                                                                                                                                                       |
++--------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| currentScaling                 | Either matches “currentRegion” or is “Overall”. This determines the max value on the Choropleth scale. If it is the current region, we choose the max of this region this year. However, if it is set to “Overall”, we instead pick the max worldwide in the current year.                                                                                                                                             |
++--------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| currentYear                    | The current year that the globe is displaying.                                                                                                                                                                                                                                                                                                                                                                         |
++--------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| currentYearPointer             | The current year, but as an integer. This always matches the above.                                                                                                                                                                                                                                                                                                                                                    |
++--------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| currentHighlightProperty       | There are three ways to color the globe: either we color it using the Total Installed Capacity in MW, or we color using the Percentage Growth W.R.T. Last Year (capped at 100%), or we color using the Net Change W.R.T. Last Year                                                                                                                                                                                     |
++--------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| currentPointOfView             | For each region, we created a latitude, longitude, and altitude to move the map to that point. This points to the current point we should focus on, which matches the current region.                                                                                                                                                                                                                                  |
++--------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| showSolarPotential             | Either True or False, it tells the globe to be colored by the Photovoltaic Potential instead.                                                                                                                                                                                                                                                                                                                          |
++--------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| currentPovTransitionTimeMillis | A default time for transitioning between focus points of the globe. We set it to 4000 milliseconds, but we afterwards used 2000 for every transition to make it faster.                                                                                                                                                                                                                                                |
++--------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+
+The values that point at a current state are often used to access the properties in “countries”, in “countries_story”, and in “maxLimits” programmatically, as shown in the table below. It is based on the JSONs we created.
+
++--------------------------------------------------------------------------------------------------------+
+| **Access examples**                                                                                    |
++--------------------------------------------------------------------------------------------------------+
+| window.countries_story\[window.currentRegion\]\[window.currentStory\]\[window.currentYear\]            |
++--------------------------------------------------------------------------------------------------------+
+| countries.properties\[window.currentStory\]\[currProperty\]\[window.currentYear\]                      |
++--------------------------------------------------------------------------------------------------------+
+| window.maxLimits\[window.currentScaling\]\[window.currentStory\]\[currMaxLimit\]\[window.currentYear\] |
++--------------------------------------------------------------------------------------------------------+
+
+There are also variables we use to store default values that we use to know the mappings and get them programmatically.\
+
++---------------+-------------------------------------------------------------------------------------------------------------------------------------------+
+| **Variable**  | **Purpose**                                                                                                                               |
++---------------+-------------------------------------------------------------------------------------------------------------------------------------------+
+| indexToRegion | Tells us which index belongs to which region. Receives a number and returns the string that index should map to.                          |
++---------------+-------------------------------------------------------------------------------------------------------------------------------------------+
+| regionToIndex | Receives a region as a string and tells you the index it should map to.                                                                   |
++---------------+-------------------------------------------------------------------------------------------------------------------------------------------+
+| indexToYear   | Receives an integer and maps it to a year it should map to, returned as a string                                                          |
++---------------+-------------------------------------------------------------------------------------------------------------------------------------------+
+| yearToIndex   | Receives a year as a string and returns the index it should map to.                                                                       |
++---------------+-------------------------------------------------------------------------------------------------------------------------------------------+
+| pointsOfView  | This object maps an index (which is a region) to the latitude, longitude, and altitude that the globe should move to whenever we need to. |
++---------------+-------------------------------------------------------------------------------------------------------------------------------------------+
+
+We also created a function to focus in a different area as needed and called it “globeFocus” (so it is called with window.globeFocus())
+
++-------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| **Function Name** | **Description**                                                                                                                                                       |
++-------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| globeFocus        | INPUT: pointOfInterest (as an integer), transitionTime = null                                                                                                         |
+|                   |                                                                                                                                                                       |
+|                   | We receive the point where we want to move to, and the time to transition there in milliseconds, if we want to. Otherwise we use a default time of 4000 milliseconds. |
++-------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+
+#### Section: Globe Functions
+
+This section is about the functions that the globe needs to update itself. We created two objects here, which are to take a value received from Shiny and get its corresponding key for the JSON. That is, maybe we received “year_highest_total_electricity” from Shiny, telling us that we want to display the Total Installed Capacity in MW, but the JSON key is not called “year_highest_total_electricity”, but instead it was called “electricity_mw”. As such, we fixed our mistake by creating these objects so that we use the correct key.
+
++------------------------+--------------------------------------------------------------------------------------------------------------------------------------------+
+| **Variable**           | **Purpose**                                                                                                                                |
++------------------------+--------------------------------------------------------------------------------------------------------------------------------------------+
+| currentHP_to_geoJsonHP | We take the Highlight Property that the user wants, which Shiny sends as a string, and this maps it to the geoJSON key it should use.      |
++------------------------+--------------------------------------------------------------------------------------------------------------------------------------------+
+| currentHP_to_maxLimit  | We take the Highlight Property that the user wants, which Shiny sends as a string, but instead it maps to the maxLimits key it should use. |
++------------------------+--------------------------------------------------------------------------------------------------------------------------------------------+
+
+Now we can go on to talk about the globe update functions. These update the globe, the color scale, or the small box in the bottom right corner which helps us know what the current state is; that is, it lets us know what is being displayed at any given moment, if for some case the user doubts that the inputs are being responsive.
+
++---------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| **Function Name**         | **Description**                                                                                                                                                                                                                                             |
++---------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| getChoroplethVal          | INPUT: feat (which stands for “feature”, an entry in the geoJSON)                                                                                                                                                                                           |
+|                           |                                                                                                                                                                                                                                                             |
+|                           | This function returns the fraction that is used for the color value and is taken from Asturiano’s (2025) Choropleth example. We retrieve the country’s value for this year, as well as the denominator, as seen above in “Access examples” table.           |
++---------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| getPotentialChoroplethVal | INPUT: feat (again, “feature”, an entry in the geoJSON)                                                                                                                                                                                                     |
+|                           |                                                                                                                                                                                                                                                             |
+|                           | This is the same function as above, but instead it uses that country’s 2020 photovoltaic potential.                                                                                                                                                         |
++---------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| updateYearRegionData      | INPUT: changeProperty, newValue                                                                                                                                                                                                                             |
+|                           |                                                                                                                                                                                                                                                             |
+|                           | This function updates the textbox in the bottom right corner that displays the current state of the globe variables. “changeProperty” states for what we want to change, like Highlight Property or Scaling, while “newValue” is the new string to display. |
++---------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| updateGlobeData           | This function calls for the globe to re-render by re-invoking the Globe.GL polygon methods with updated state.\                                                                                                                      |
+|                           | We also change the content in the Story panel that is on the top right.                                                                                                                                                                                     |
++---------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+
+#### Section: Loading Globe
+
+This section sets up the globe if it detects that it has not yet been attached to the window. Note that we took the globe initialization code from Asturiano’s (2025) Choropleth example, just adapting the label and the function used to get the Choropleth value.
+
+![](images/clipboard-3578142732.png)
+
+#### ![](images/clipboard-3437239204.png)Section: Shiny websocket hooks
+
+To receive inputs from Shiny into mywidget.js, we used Shiny.addCustomMessageHandler(), creating various handlers that change the state variables described in previous sections. These work like websockets, a pattern we had prior experience with.
+
++-------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| **Shiny Websocket Hook\ | **Description**                                                                                                                                                                                                                                                                                    |
+| (Function Name)**       |                                                                                                                                                                                                                                                                                                    |
++-------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| questionChange          | INPUT: newQuestion                                                                                                                                                                                                                                                                                 |
+|                         |                                                                                                                                                                                                                                                                                                    |
+|                         | This receives the question input. Each time the question is changed, we hide the things belonging to the other question, and display the user’s choice.                                                                                                                                            |
++-------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| storyChange             | INPUT: newStory                                                                                                                                                                                                                                                                                    |
+|                         |                                                                                                                                                                                                                                                                                                    |
+|                         | Receives the Renewable Energy that the user wants to look at. We internally called it “story”. This will change the data that the globe displays.                                                                                                                                                  |
++-------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| Refocus                 | INPUT: message (ignored)                                                                                                                                                                                                                                                                           |
+|                         |                                                                                                                                                                                                                                                                                                    |
+|                         | Shiny or HTMLWidget forced us to send at least some input, but the reality is we ignore it. This function will re-focus the globe on the current region, in case the user wanders around.                                                                                                          |
++-------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| yearStep                | INPUT: direction                                                                                                                                                                                                                                                                                   |
+|                         |                                                                                                                                                                                                                                                                                                    |
+|                         | This function is called with direction=”prev” when the user wants to go to a previous year, and with “next” when they want to go to the next year. The globe is updated to show the new year, but we also take next year’s Max value, and we update the story and the bottom right box.            |
++-------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| regionStep              | INPUT: direction                                                                                                                                                                                                                                                                                   |
+|                         |                                                                                                                                                                                                                                                                                                    |
+|                         | Similar to the above function, but instead of changing year, it changes to the next Region, using                                                                                                                                                                                                  |
++-------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| hpChange                | INPUT: newChoice                                                                                                                                                                                                                                                                                   |
+|                         |                                                                                                                                                                                                                                                                                                    |
+|                         | The user has three options to use for coloring the Globe.                                                                                                                                                                                                                                          |
+|                         |                                                                                                                                                                                                                                                                                                    |
+|                         | “Year’s Highest Total Electricity (MW)” will color the globe according to that year’s highest country.                                                                                                                                                                                             |
+|                         |                                                                                                                                                                                                                                                                                                    |
+|                         | “Growth Percentage W.R.T. Last Year” will color the globe according to that year’s highest country percentage, capped at 100%. This cap lets us color all countries that did some growth, so this one shows that efforts are ongoing, though sometimes minuscule.                                  |
+|                         |                                                                                                                                                                                                                                                                                                    |
+|                         | “Net Change W.R.T. Last Year (MW)” is like the previous one, but since it uses MW, it is not capped. As such, you will see countries that grew the most.                                                                                                                                           |
++-------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| scalingChange           | INPUT: newChoice                                                                                                                                                                                                                                                                                   |
+|                         |                                                                                                                                                                                                                                                                                                    |
+|                         | The user can choose either “regional” or “Overall” (worldwide) scaling, which changes which country gets chosen as the max for that year. This changes the choropleth’s denominator. Worldwide tends to push the max higher, so you will only see countries that rival the global scale of growth. |
++-------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| storyChange             | INPUT: newChoice                                                                                                                                                                                                                                                                                   |
+|                         |                                                                                                                                                                                                                                                                                                    |
+|                         | The user can choose the Renewable Energy they want to inspect, whether “solar” or “wind”, or any other (if we enable others). It then updates the globe to show the data.                                                                                                                          |
++-------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| togglePotential         | INPUT: newChoice                                                                                                                                                                                                                                                                                   |
+|                         |                                                                                                                                                                                                                                                                                                    |
+|                         | The user either enables or disables the Photovoltaic Potential. This function receives the checkbox value and updates the globe.                                                                                                                                                                   |
++-------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+
+#### Section: Story Div added on First Time Run
+
+To add the drawer in the top right that displays the Story text, we manually append it via JavaScript. The CSS design uses a transition trick toggling the width with “transition” and “ease-in-out” properties, making the panel appear to slide open and closed. A small onClick function manages this toggle.
+
+![](images/clipboard-1667404382.png)
+
+We used the same process to add the box on the bottom right corner that displays the current state of the globe variables, but without the hiding abilities.
+
+![](images/clipboard-3490877521.png)
+
++-------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| **Function Name** | **Description**                                                                                                                                                                                                                                          |
++-------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+| onClick           | INPUT: None                                                                                                                                                                                                                                              |
+|                   |                                                                                                                                                                                                                                                          |
+|                   | This function is appended to the little button on the Story Drawer, so that when it is clicked, it switches up the classes that the drawer has, from “closed” to “open”, which changes the width of the drawer, making it seem like it opens and closes. |
++-------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+
+### Deploying to shinyapps.io
+
+For this part, we wanted to make our app easily accessible. As such, we looked into deploying our app with shinyapps.io. The main challenge was the custom HTMLWidget package — once the Shiny app was uploaded to the platform, it wouldn’t know where to fetch the package from. To resolve this, we uploaded the package to a private GitHub repo and configured the Shiny app to install it from there on startup.
+
+Fortunately, shinyapps.io has an easy way to link your account with Github, and to give access to private repos (which we cannot recommend easily, but given that this code probably should not be available to other students, we had no other choice). We followed Posit Support (2025) for that first step. The steps for this are not code in itself, so it is not present in any one place, but we will try to include our process here; first, we begun by renaming our shiny file into “app.R”, and moving it, as well as the files that require it, to a new folder we called “shinyapp” (as can be seen in the project’s final structure).
+
+The base process is presented to you by shinyapps.io, which simplifies the process. Here I won’t show the “setAccountInfo” command, since it would potentially compromise my credentials.
+
+![](images/clipboard-649056377.png)
+
+![](images/clipboard-4200396535.png)
+
+The custom package installation required using “remotes::install_github()”. We then created a snapshot of our libraries using “renv::snapshot()”, which produces a “renv.lock” file listing all project dependencies. We verified that our “P2A1” package was listed with the source set to “Github”, ensuring the deployed app would pull the library from the correct location. With that in place, the app deployed correctly.
+
+## References
+
+Asturiano, V. (2025). *Globe.GL.* GitHub. Retrieved from: <https://github.com/vasturiano/globe.gl>
+
+*Creating a widget* (n.d.). htmlwidgets for R. Retrieved from: https://www.htmlwidgets.org/develop_intro.html#overview
+
+*Globe.GL. UI component for Globe Data Visualization using ThreeJS/WebGL* (n.d.). Globe.GL Retrieved from: https://globe.gl
+
+Hoare, J. (2025. April 7). *How to Build an Interactive Globe in R With The Three.js Package.* DisplayR. Retrieved from: https://www.displayr.com/interactive-globe-r/
+
+Lewis, B.W. (2025). *Three.js and R.* Github. Retrieved from: https://github.com/bwlewis/rthreejs
+
+Lewis, B.W. (n.d.). *The threejs package: three.js widgets for R.* Github. Retrieved from: https://bwlewis.github.io/rthreejs/
+
+Oh, J., Lim, H. S., Copple, J. G., & Chadraba, E. K. (2018). *Harnessing the persuasive potential of data: The combinatory effects of data visualization and interactive narratives on obesity perceptions and policy attitudes.* In Telematics and Informatics (Vol. 35, Issue 6, pp. 1755–1769). Elsevier BV. https://doi.org/10.1016/j.tele.2018.05.004
+
+Our World in Data (2025). *Data Page: Installed capacity for different renewable technologies.* Data adapted from IRENA. Retrieved from https://ourworldindata.org/grapher/installed-global-renewable-energy-capacity-by-technology \[online resource\]
+
+Perdana, A., Rob, A., & Rohde, F. (2018). *Does Visualization Matter? The Role of Interactive Data Visualization to Make Sense of Information.* In Australasian Journal of Information Systems (Vol. 22). Australasian Association for Information Systems. https://doi.org/10.3127/ajis.v22i0.1681
+
+Posit Support (2025, April 30*). Enabling use of private packages on github.com for applications on shinyapps.io.* Posit. Retrieved from: https://support.posit.co/hc/en-us/articles/204536558-Enabling-use-of-private-packages-on-github-com-for-applications-on-shinyapps-io
+
+*Renewable capacity statistics* (2025, March). IRENA. Retrieved from: https://www.irena.org/Publications/2025/Mar/Renewable-capacity-statistics-2025
+
+World Bank. (2023). *Global Solar Atlas* \[Data set\]. World Bank Group. <https://datacatalog.worldbank.org/search/dataset/0038379>
+
+World Bank Group, ESMAP, & Solargis. *Global PV potential study*. Global Solar Atlas. <https://globalsolaratlas.info/global-pv-potential-study>
+
+Natural Earth. (n.d.). *1:110m Cultural Vectors*. Retrieved May 7, 2025, from <https://www.naturalearthdata.com/downloads/110m-cultural-vectors/>

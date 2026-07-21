@@ -1,0 +1,496 @@
+---
+title: "question_2_pre-processing"
+output: html_document
+---
+
+```{r}
+library(readxl)
+library(janitor)
+irena <- read_excel("../data/irena_stats.xlsx", sheet=2)
+irena <- clean_names(irena)
+names(irena)
+```
+
+
+
+So what we need to do here is take the "irena_stats.xlsx" file and send this to be transformed into geoJSON data, right?
+
+```{r}
+irena_region <- read_excel(
+  "../data/irena_stats.xlsx",
+  sheet=3
+)
+
+irena_region <- clean_names(irena_region)
+
+irena_region
+```
+
+```{r fig.width=10}
+ggplot(
+  irena_region,
+  aes(
+    x = year,
+    y = sum_of_electricity_installed_capacity_mw,
+    group=region,
+    color=region
+  )
+) +
+  facet_wrap(.~group_technology) +
+  geom_line()
+```
+
+
+```{r fig.width=10}
+ggplot(
+  filter(irena_region, region != "Asia"),
+  aes(
+    x = year,
+    y = sum_of_electricity_installed_capacity_mw,
+    group=region,
+    color=region
+  )
+) +
+  facet_wrap(.~group_technology) +
+  geom_line()
+```
+
+
+
+
+
+```{r}
+irena %>%
+  distinct(year)
+```
+
+```{r}
+names(irena)
+```
+
+```{r}
+irena %>%
+  group_by(iso3_code, group_technology, year) %>%
+  summarize(
+    electricity_mw = sum(electricity_installed_capacity_mw)
+  ) 
+  #select(iso3_code, group_technology, year, electricity_installed_capacity_mw) %>%
+  #arrange(iso3_code, group_technology, year)
+```
+
+```{r}
+irena
+```
+
+
+```{r}
+names(irena)
+```
+
+```{r}
+library(tidyverse)
+
+irena_per_energy_type <- irena %>%
+  group_by(country, year, group_technology, iso3_code) %>%
+  summarize(
+    total_capacity_mw = sum(electricity_installed_capacity_mw, na.rm = T),
+    .groups="drop"
+  )
+  
+irena_per_energy_type
+  
+all_countries <- unique(irena_per_energy_type$country)
+all_years <- 2000:max(irena_per_energy_type$year)
+all_energies <- unique(irena$group_technology)
+```
+
+```{r}
+full_grid <- expand.grid(
+  country = all_countries,
+  year = all_years,
+  group_technology = all_energies
+)
+
+full_grid
+
+#Filling the missing years values with 0 capacity
+energy_complete <- full_grid %>%
+  left_join(irena_per_energy_type, by = c("country", "year", "group_technology")) %>%
+  mutate(total_capacity_mw = ifelse(is.na(total_capacity_mw), 0, total_capacity_mw))
+
+energy_complete <- energy_complete %>%
+  left_join(irena_per_energy_type %>%
+    distinct(country, iso3_code),
+    by = c("country")
+  ) %>%
+  select(
+    year, country,
+    iso3_code.y,
+    group_technology,
+    total_capacity_mw
+  ) %>%
+  rename(
+    iso3_code = iso3_code.y
+  )
+
+irena_per_energy_type %>%
+  distinct(country, iso3_code)
+
+energy_complete
+```
+
+
+```{r}
+irena_summary <- energy_complete %>%
+  group_by(iso3_code, group_technology, year) %>%
+  summarize(
+    country = first(country),
+    electricity_mw = sum(total_capacity_mw)
+  ) %>%
+  arrange(year) %>%
+  mutate(
+    raw_change = electricity_mw - lag(electricity_mw, default = 0),
+    net_change_so_far = raw_change + lag(raw_change, default = 0),
+    net_percentage_wrt_last_year = if_else(
+      lag(electricity_mw, default = 0) == 0, 0,
+      raw_change * 100 / lag(electricity_mw, default = 1)
+    ),
+  )
+irena_summary_2 <- irena_summary %>%
+  group_by(
+    iso3_code, group_technology
+  ) %>%
+  arrange(iso3_code, group_technology, year) %>%
+  mutate(
+    total_decrease = sum(
+      raw_change[raw_change < 0],
+      na.rm = T
+    ),
+    total_increase = sum(
+      raw_change[raw_change > 0],
+      na.rm = T
+    ),
+    
+    first_year = first(electricity_mw),
+    last_year = last(electricity_mw),
+    net_change = total_decrease + total_increase,
+    net_percentage = (net_change / (if_else(first_year == 0, 1, first_year)) * 100),
+    change_2000_this_year = electricity_mw - first_year,
+    change_percentage_2000_this_year = (abs(change_2000_this_year)) / (if_else(first_year == 0, 1, first_year)) * 100 
+  ) %>%
+  ungroup()
+
+irena_summary_2
+  
+irena_summary_2 %>%
+  filter(country == "Algeria", group_technology=="Fossil fuels")
+
+irena_summary <- irena_summary_2
+```
+
+```{r}
+#2000, then 2010 onwards two years. 2016 onwards yearly.
+
+irena_summary %>%
+  filter(group_technology == "Solar energy")
+```
+
+
+
+```{r}
+irena_summary %>% distinct(group_technology)
+```
+
+
+```{r}
+irena_summary <- irena_summary %>% mutate(
+  group_technology = case_when(
+    group_technology == "Bioenergy" ~ "bioenergy",
+    group_technology == "Fossil fuels" ~ "fossil",
+    group_technology == "Solar energy" ~ "solar",
+    group_technology == "Wind energy" ~ "wind",
+    group_technology == "Hydropower (excl. Pumped Storage)" ~ "hydropower",
+    group_technology == "Nuclear" ~ "nuclear",
+    group_technology == "Other non-renewable energy" ~ "other_nr",
+    group_technology == "Geothermal energy" ~ "geothermal",
+    group_technology == "Pumped storage" ~ "pumpedstorage",
+    group_technology == "Marine energy" ~ "marine",
+    .default="unknown"
+  )
+)
+
+irena_summary
+```
+
+We iterate over the geoJSON, and in that process, we check for the ISO3_code to see if we have something in that geoJSON to add. We create a JSON in the form needed to apply the changes to the geoJSON from which bounding boxes and other data is taken. By merging this data together, we can make the globe very dynamic.
+
+So in short we need...
+1) A JSON that will have each country, per country, the energy type, per energy type, a year. Per year, a property. This can be done either way, really. Either you group per property, or you group per year. I don't know which might be easier to work with, honestly. Could be easier to work on the property first, then at the end the year. It might help us see missing properties as well, so I might go for that.
+
+So one more time...
+ISO_A3 Country Name -> Energy Group -> Property -> Year
+
+
+```{r}
+library(jsonlite)
+
+irena_summary
+```
+
+```{r}
+irena_overall_per_technology_highest_yearly_values <- irena_summary %>%
+  group_by(group_technology, year) %>%
+  summarize(
+    year_highest_raw_change = max(raw_change),
+    year_highest_total_electricity = max(electricity_mw),
+    max_percentage_wrt_last_year = max(net_percentage_wrt_last_year, na.rm=T, default=0)
+  )
+
+irena_overall_per_technology_highest_yearly_values
+```
+
+Okay, so that's the overall biggest energy contribution for each case. We also have a case where we can simply compare to 100% in our choropleth, right? Alright. Now let's get this per region! This requires us to have a "region" column in this table. For that, I've created a csv manually collecting the ISO Alpha3 and the region each country belongs to. Some countries are sadly excluded, discriminated. We'll see who they are, but essentially, we do not have the Geojson bounding boxes to draw them.
+
+
+```{r}
+iso_3_region <- read_csv("../data/country_region_pairing_SHARE.csv")
+problems(iso_3_region)
+
+iso_3_region <- iso_3_region %>%
+  select(country, code, region, iso_a3)
+
+iso_3_region %>%
+  filter(iso_a3 == "SSD")
+```
+
+
+Great! Now it's time to do a JOIN using the ISO_A3 and add the region we're going to use per country. HOWEVER, some of these countries are duplicated!!! What to do? Well, we can simply make it so there are two columns. How so? Use this new csv as the right join, so that the original table's entries are duplicated. Why not? We're not using it for anything other than for highlighting regions in our globe, in which sometimes countries appear twice, since some regions are bigger than others.
+
+```{r}
+irena_summary
+```
+
+
+```{r}
+irena_per_region_all <- irena_summary %>%
+  right_join(iso_3_region, by=join_by(iso3_code == iso_a3), relationship="many-to-many") %>%
+  select(region, iso3_code, country.x, group_technology, year,
+         electricity_mw, net_percentage_wrt_last_year, raw_change
+  ) %>%
+    rename(
+      country = country.x
+    )
+
+irena_per_region_all
+```
+
+Excellent! now let's get the highest per region per year!
+
+```{r}
+irena_per_region_summary <- irena_per_region_all %>%
+  group_by(region, group_technology, year) %>%
+  summarize(
+    year_highest_raw_change = max(raw_change),
+    year_highest_total_electricity = max(electricity_mw),
+    max_percentage_wrt_last_year = max(net_percentage_wrt_last_year, na.rm=T, default=0)
+  )
+
+irena_per_region_summary
+```
+
+Okay, now we have to bind these together, by adding a "region" to the irena "all" data that states the region is "overall".
+
+```{r}
+irena_overall_per_technology_highest_yearly_values <- irena_overall_per_technology_highest_yearly_values %>%
+  mutate(
+    region = "Overall"
+  )
+
+irena_overall_per_technology_highest_yearly_values
+```
+Let's try and bind these together
+
+```{r}
+irena_highest_values_bind <- bind_rows(irena_overall_per_technology_highest_yearly_values, irena_per_region_summary)
+
+irena_highest_values_bind
+```
+
+Now to make the JSON, we need a nested version. We will pivot this into a longer format first.
+
+```{r}
+irena_highest_values_longer <- irena_highest_values_bind %>%
+  pivot_longer(
+    cols= c("year_highest_total_electricity", "max_percentage_wrt_last_year", "year_highest_raw_change"),
+    names_to="highlight_property",
+    values_to="value"
+  )
+
+irena_highest_values_longer 
+```
+
+
+
+```{r}
+
+# Approach based on akrun (2019) https://stackoverflow.com/a/56656268
+comparison_json_preprocessing <- irena_highest_values_longer %>%
+  group_by(region, group_technology, highlight_property) %>%
+  summarize(
+    yearx = list(as.list(setNames(value,year))), .groups="drop"
+  ) %>%
+  nest(highlight_property = c(highlight_property, yearx)) %>%
+  mutate(highlight_property = map(highlight_property, deframe)) %>%
+  nest(group_technology =c(group_technology, highlight_property)) %>%
+  mutate(group_technology = map(group_technology, deframe)) %>%
+  deframe()
+
+# Don't run this printing line unless you're ready to slow down your computer.
+#comparison_json_preprocessing 
+```
+
+```{r}
+comparison_json <- toJSON(comparison_json_preprocessing, pretty=T, auto_unbox=T)
+write(comparison_json, "comparisons.json")
+```
+
+Great! Honestly it was pretty tiresome to do this. But now we can actually carry on and create the JSON that we need to integrate into the geoJSON. Okay, for this one, what we need is a per country, per technology, per property, per year
+
+```{r}
+irena_summary_clean <- irena_summary %>%
+  mutate(
+    raw_change = if_else(
+      is.na(raw_change),
+      0.0,
+      raw_change
+    ),
+    net_change_so_far = if_else(
+      is.na(net_change_so_far),
+      0.0,
+      net_change_so_far
+    ),
+    net_percentage_wrt_last_year = if_else(
+      is.na(net_percentage_wrt_last_year),
+      0.0,
+      net_percentage_wrt_last_year
+    )
+  )
+
+irena_summary_clean
+```
+
+Okay, now we'll do the same nesting work, but this time with this dataset. Similarly, I can guess we will need some pivoting!
+
+```{r}
+irena_per_country_longer <- irena_summary %>%
+  pivot_longer(
+    cols = c("electricity_mw", "net_percentage_wrt_last_year", "raw_change"),
+    names_to= "highlight_property",
+    values_to="value"
+  ) %>%
+  select(iso3_code, country, group_technology, year, highlight_property, value)
+
+irena_per_country_longer
+
+# Not needed anymore.
+#irena_per_country_longer <- irena_per_country_longer %>% mutate(
+#  group_technology = case_when(
+#    group_technology == "Bioenergy" ~ "bioenergy",
+#    group_technology == "Fossil fuels" ~ "fossil",
+#    group_technology == "Solar energy" ~ "solar",
+#    group_technology == "Wind energy" ~ "wind",
+#    group_technology == "Hydropower (excl. Pumped Storage)" ~ "hydropower",
+#    group_technology == "Nuclear" ~ "nuclear",
+#    group_technology == "Other non-renewable energy" ~ "other_nr",
+#    group_technology == "Geothermal energy" ~ "geothermal",
+#    group_technology == "Pumped storage" ~ "pumpedstorage",
+#    group_technology == "Marine energy" ~ "marine",
+#    .default="unknown"
+#  )
+#)
+
+irena_per_country_longer %>%
+  filter(country == "South Sudan" & group_technology == "fossil")
+```
+
+
+
+```{r}
+country_json_preprocessing <- irena_per_country_longer %>%
+  group_by(iso3_code, group_technology, highlight_property) %>%
+  summarize(
+    yearx = list(as.list(setNames(value, year))), .groups="drop"
+  ) %>%
+  nest(highlight_property = c(highlight_property, yearx)) %>%
+  mutate(highlight_property = map(highlight_property, deframe)) %>%
+  nest(group_technology =c(group_technology, highlight_property)) %>%
+  mutate(group_technology = map(group_technology, deframe)) %>%
+  deframe()
+```
+
+```{r}
+country_performance_json <- toJSON(country_json_preprocessing, pretty=T, auto_unbox=T)
+write(country_performance_json, "country_performance.json")
+```
+
+
+Great! The next step then, is to send this to the globe and let the globe use the geoJSON to work it out!
+So now it's time for the interactivity to work out. The first step is letting the geoJSON work the data out.
+In fact, the most sane thing right now might be to pre-do this by creating a script that does this.
+
+```{r}
+# here and in below chunks we will be converting solar radiance data-set to json to be merged into geoJSON later
+
+solar_potential <- read_xlsx("../data/pv_potential_ranking.xlsx",sheet = 1,skip = 1)
+
+
+```
+
+
+```{r}
+
+names(solar_potential)
+
+pv_country_data <- solar_potential[,c("ISO_A3","Average practical potential \r\n(PVOUT Level 1, \r\nkWh/kWp/day), long-term")]
+
+```
+
+
+```{r}
+
+pv_country_data
+
+```
+```{r}
+
+colnames(pv_country_data)[2] <- "practical_potential_level1"
+
+```
+
+```{r}
+
+pv_country_data
+
+```
+
+
+```{r}
+
+solar_json_preprocessing <- pv_country_data %>%
+  mutate(SOLAR_POT = practical_potential_level1) %>%
+  select(ISO_A3, SOLAR_POT) %>%
+  nest(data = SOLAR_POT) %>%
+  mutate(data = map(data, ~setNames(list(.x$SOLAR_POT), "SOLAR_POT"))) %>%
+  deframe()
+
+```
+
+
+```{r}
+
+
+solar_potential_json <- toJSON(solar_json_preprocessing, pretty=T, auto_unbox=T)
+write(solar_potential_json, "solar_potential.json")
+
+```
+

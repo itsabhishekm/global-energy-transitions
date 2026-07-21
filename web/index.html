@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Global Renewable Energy Transitions</title>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="globe.css">
+  <!-- D3 for color scales -->
+  <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/d3-scale-chromatic@3.1.0/dist/d3-scale-chromatic.min.js"></script>
+  <!-- Globe.GL -->
+  <script src="https://cdn.jsdelivr.net/npm/globe.gl@2.41.4/dist/globe.gl.min.js"></script>
+</head>
+<body>
+
+  <div id="sidebar-panel">
+    <div class="sidebar-section">
+      <label class="ctrl-label" for="story">Energy Type</label>
+      <select id="story" class="ctrl-select">
+        <option value="solar" selected>Solar</option>
+        <option value="wind">Wind</option>
+      </select>
+    </div>
+
+    <div class="sidebar-section">
+      <button id="refocus" class="ctrl-btn full">⟳ Re-focus on Region</button>
+    </div>
+
+    <div class="sidebar-section">
+      <label class="ctrl-label">Region</label>
+      <div class="btn-row">
+        <button id="prevRegion" class="ctrl-btn half">◀ Prev</button>
+        <button id="nextRegion" class="ctrl-btn half">Next ▶</button>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <label class="ctrl-label">Year</label>
+      <div class="btn-row">
+        <button id="prevStep" class="ctrl-btn half">◀ Prev</button>
+        <button id="nextStep" class="ctrl-btn half">Next ▶</button>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <label class="ctrl-label" for="highlight_property">Highlight Property</label>
+      <select id="highlight_property" class="ctrl-select">
+        <option value="Year's Highest Total Electricity (MW)" selected>Highest Total Electricity (MW)</option>
+        <option value="Growth Percentage W.R.T Last Year">Growth % vs Last Year</option>
+        <option value="Net Change W.R.T. Last Year (MW)">Net Change vs Last Year (MW)</option>
+      </select>
+    </div>
+
+    <div class="sidebar-section">
+      <label class="ctrl-label" for="scaling">Scaling</label>
+      <select id="scaling" class="ctrl-select">
+        <option value="regional" selected>Regional</option>
+        <option value="worldwide">Worldwide</option>
+      </select>
+    </div>
+
+    <div class="sidebar-section">
+      <label class="ctrl-checkbox">
+        <input type="checkbox" id="showPotential">
+        <span>Show Photovoltaic Growth Potential</span>
+      </label>
+    </div>
+  </div>
+
+  <div id="main-panel">
+    <div id="globe-container"></div>
+  </div>
+
+  <script src="globe.js"></script>
+</body>
+</html>
