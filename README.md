@@ -1,108 +1,206 @@
 # Global Renewable Energy Transitions
 
-An end-to-end data project tracking solar and wind energy capacity growth across every country from 2000 to 2024. The output is an interactive 3D globe built in R and JavaScript — you step through years, switch between regions, and watch how the energy picture shifts country by country.
+An end-to-end data engineering and visualization project that tracks the growth of **solar** and **wind** energy capacity across every country from **2000–2024**.
+
+The project transforms raw renewable energy datasets into a processed geospatial data model powering an interactive **3D globe**, where users can explore renewable energy adoption over time, compare regions, and analyze growth trends through multiple metrics.
 
 ---
 
-## What it shows
+## Overview
 
-The globe colors every country based on three metrics you can switch between:
+This project combines data engineering, exploratory data analysis, geospatial processing, and interactive visualization into a single analytics pipeline.
 
-- **Total installed capacity (MW)** : how much solar or wind a country has built in a given year
-- **Year-over-year % growth**: how fast it's growing relative to its own prior year
-- **Net MW change**: raw capacity added or removed vs. the previous year
+Users can:
 
-Alongside the visualization, I modeled growth trends using lag-based time series analysis — computing absolute and percentage change for each country across every year — and used regional max aggregations to build a dynamic color scale that recalibrates when you switch between worldwide and regional views. The regional scaling was a direct result of the EDA finding that Africa and South America are nearly invisible on a global scale despite meaningful growth rates.
+* Explore renewable energy adoption country-by-country
+* Animate changes from 2000 to 2024
+* Compare global and regional renewable growth
+* Switch between solar and wind datasets
+* View countries using multiple analytical metrics
+* Compare installed capacity with solar resource potential
 
-There's also a solar PV potential overlay (SolarGIS data) that lets you compare a country's actual capacity against the solar resource it has available — useful for spotting where the gap between potential and deployment is largest.
-
----
-
-## Data pipeline
-
-### Where the data comes from
-
-The project pulls from two public datasets. IRENA publishes annual renewable electricity capacity by country and technology going back to 2000 — that's the backbone. SolarGIS has country-level photovoltaic potential rankings, which power the solar overlay. I also put together a small CSV manually mapping ISO Alpha-3 codes to the seven regions the globe uses for its storytelling mode, since no clean version of that grouping existed off the shelf.
-
-Raw files sit in `data/raw/` untouched.
-
-| File | Source |
-|---|---|
-| `irena_stats.xlsx` | [IRENA](https://www.irena.org/Statistics) |
-| `solargis_pvpotential_countryranking_2020_data.xlsx` | [SolarGIS](https://solargis.com) |
-| `world_country_and_usa_states_latitude_and_longitude_values.csv` | Public domain |
-| `country_region_pairing_SHARE.csv` | Manually compiled |
-
-### Cleaning and transformation (`scripts/preprocessing.Rmd`)
-
-The IRENA file has multiple sheets — country-level data on sheet 2, regional aggregates on sheet 3. I loaded both with `readxl` and cleaned up the column names with `janitor::clean_names()`.
-
-The trickier part was the missing data. IRENA only includes rows where a country reported capacity, so any country-year with zero capacity simply doesn't appear. Before calculating any growth rates, I built a complete grid of every country × year × energy type with `expand.grid()`, joined the actual data onto it, and filled the gaps with zero. Without that step, lag-based calculations break at the edges and growth rates come out wrong.
-
-From the filled panel I computed three features per country per technology per year: total installed capacity in MW, the raw MW change from the prior year via lag differencing, and percentage growth relative to the prior year. I also aggregated regional and global max values for each metric per year — those go into `comparisons.json` and are what drives the color scale normalization when you switch between regional and worldwide views.
-
-Getting the JSON into the right nested shape (`region → energy type → metric → year → value`) took a sequence of `pivot_longer`, `group_by`, `nest`, and `deframe` calls. The nesting approach is based on [akrun's method on Stack Overflow](https://stackoverflow.com/a/56656268). The solar potential data went through a lighter path — extracted, renamed, and written out as `solar_potential.json` keyed by ISO Alpha-3 code.
-
-The last step merged everything into a Natural Earth GeoJSON. Each country polygon carries its full energy history in the `properties` object. That one file is what the globe loads at runtime.
-
-### Processed outputs (`data/processed/`)
-
-| File | Description |
-|---|---|
-| `countries_updated.geojson` | Country polygons with all energy data embedded |
-| `comparisons.json` | Regional and global max values per metric/year |
-| `countries_story.json` | Narrative text per region, energy type, and year |
-| `country_performance.json` | Per-country stats (standalone reference) |
-| `solar_potential.json` | PV potential by ISO code |
+The visualization is built with **globe.gl**, **Three.js**, **D3.js**, and a preprocessing pipeline written entirely in **R**.
 
 ---
 
-## Exploratory data analysis (`scripts/eda.R`)
+# Features
 
-I ran EDA on solar and wind separately before touching the pipeline. Capacity across countries is heavily right-skewed — a handful of countries account for most of the global total, which makes aggregate charts misleading. Looking at year-over-year growth rates after gap-filling told a different story: smaller countries sometimes show faster percentage growth even with low absolute numbers.
+### Renewable Energy Metrics
 
-I also pulled regional aggregates from the IRENA sheet and built faceted line plots to compare regions over time. That's what made it clear the globe needed a regional scaling option. On a worldwide color scale, Africa's growth is nearly invisible even in years where it was growing fast in relative terms.
+Each country can be visualized using one of three analytical measures:
 
----
-
-## Visualization
-
-The globe runs on [globe.gl](https://globe.gl/) v2.41.4 (Three.js and WebGL under the hood) with D3 v7 handling the color scales. Capacity and raw change use `scaleSequentialSqrt` with `interpolateYlOrRd` (yellow to red). Percentage growth uses `interpolatePuOr`, a diverging scale, since values can go negative.
-
-The original version was an R Shiny app with a custom htmlwidget. I converted it to a standalone static site by pulling out the JavaScript and replacing all the Shiny websocket calls with plain DOM event listeners. That's what makes it deployable on Vercel without a server.
+* **Installed Capacity (MW)**: Total solar or wind capacity for a selected year
+* **Year-over-Year Growth (%)**: Percentage growth relative to the previous year
+* **Net Capacity Change (MW)**: Absolute increase or decrease from the previous year
 
 ---
 
-## Project structure
+### Dynamic Regional Scaling
+
+One of the largest challenges during development was the extreme imbalance between countries.
+
+Large producers such as China and the United States dominate global capacity, making smaller but rapidly growing countries nearly invisible.
+
+To solve this, the preprocessing pipeline computes:
+
+* Regional maximum values
+* Global maximum values
+* Year-specific normalization
+
+When users switch between worldwide and regional views, the color scale automatically recalibrates, allowing meaningful comparison regardless of region.
+
+---
+
+### Solar Potential Overlay
+
+The globe also includes a **SolarGIS PV Potential** overlay.
+
+This allows users to compare:
+
+* Available solar resources
+* Installed solar infrastructure
+
+making it easy to identify countries with high renewable potential but relatively low deployment.
+
+---
+
+# Data Sources
+
+The project combines multiple public datasets.
+
+| Dataset                             | Purpose                                              |
+| ----------------------------------- | ---------------------------------------------------- |
+| IRENA Renewable Capacity Statistics | Historical renewable capacity by country (2000–2024) |
+| SolarGIS PV Potential Rankings      | Country-level photovoltaic potential                 |
+| Latitude & Longitude Dataset        | Country centroids                                    |
+| Country–Region Mapping              | Custom ISO Alpha-3 regional mapping                  |
+
+Raw datasets remain unchanged inside:
 
 ```
-├── web/                         # Static site — what gets deployed
+data/raw/
+```
+
+---
+
+# Data Engineering Pipeline
+
+The preprocessing workflow transforms raw Excel files into optimized JSON and GeoJSON files used directly by the visualization.
+
+## 1. Data Extraction
+
+* Import multi-sheet Excel files using `readxl`
+* Standardize schemas with `janitor`
+* Load renewable capacity and regional summary tables
+
+---
+
+## 2. Data Cleaning
+
+IRENA only reports years where renewable capacity exists.
+
+Missing country-year combinations do **not** appear in the source data.
+
+To create a complete analytical dataset:
+
+* Generate every Country × Year × Technology combination
+* Join reported observations
+* Replace missing values with zero capacity
+
+This complete panel enables accurate lag calculations and prevents incorrect growth metrics.
+
+---
+
+## 3. Feature Engineering
+
+For every country, technology, and year, the pipeline calculates:
+
+* Installed Capacity
+* Net Capacity Change
+* Year-over-Year Growth (%)
+
+Additional regional and global summary statistics are generated for visualization normalization.
+
+---
+
+## 4. JSON Generation
+
+Processed datasets are transformed into nested JSON structures optimized for client-side rendering.
+
+The pipeline exports:
+
+* Country energy histories
+* Regional comparison statistics
+* Narrative content
+* Solar potential data
+* Performance summaries
+
+---
+
+## 5. GeoJSON Construction
+
+The final step enriches Natural Earth polygons by embedding each country's historical renewable data directly into the GeoJSON properties.
+
+The web application only needs to load this processed file at runtime.
+
+---
+
+# Exploratory Data Analysis
+
+Before building the visualization, exploratory analysis was performed on both solar and wind datasets.
+
+Key findings included:
+
+* Renewable capacity is highly right-skewed.
+* A small number of countries dominate global production.
+* Smaller countries often exhibit significantly higher percentage growth.
+* Regional scaling is essential for meaningful visualization.
+
+These insights directly influenced both the preprocessing pipeline and visualization design.
+
+---
+
+# Visualization
+
+The interactive globe is built using:
+
+* **globe.gl**
+* **Three.js**
+* **D3.js**
+
+Color scales are optimized for each metric:
+
+* Square-root sequential scales for installed capacity and MW change
+* Diverging scales for growth percentage
+
+The application originally began as an **R Shiny** application before being refactored into a fully static JavaScript application suitable for deployment on **Vercel**.
+
+---
+
+# Project Structure
+
+```
+├── web/
 │   ├── index.html
 │   ├── globe.js
 │   ├── globe.css
-│   ├── customtheming.css
 │   └── data/
 │
-├── shiny/                       # Original R Shiny app
+├── shiny/
 │   ├── app.R
 │   └── data/
 │
-├── widget/                      # R htmlwidget source
-│   ├── R/mywidget.R
-│   └── inst/htmlwidgets/
+├── widget/
 │
 ├── data/
 │   ├── raw/
 │   └── processed/
 │
 ├── scripts/
-│   ├── eda.R
-│   └── preprocessing.Rmd
+│   ├── preprocessing.Rmd
+│   └── eda.R
 │
 ├── docs/
-│   ├── about.qmd
-│   ├── presentation.qmd
-│   └── _quarto.yml
 │
 ├── renewable-energy-globe.Rproj
 └── vercel.json
@@ -110,46 +208,67 @@ The original version was an R Shiny app with a custom htmlwidget. I converted it
 
 ---
 
-## Setup
+# Processed Outputs
 
-### Run the data pipeline
+| File                        | Description                                      |
+| --------------------------- | ------------------------------------------------ |
+| `countries_updated.geojson` | Country polygons with embedded renewable history |
+| `comparisons.json`          | Regional and global normalization values         |
+| `countries_story.json`      | Narrative descriptions by region and year        |
+| `country_performance.json`  | Country-level statistics                         |
+| `solar_potential.json`      | SolarGIS PV potential data                       |
 
-Open `scripts/preprocessing.Rmd` in RStudio and run all chunks. You need `readxl`, `janitor`, `tidyverse`, and `jsonlite`. Outputs write to `data/processed/`.
+---
+
+# Running the Project
+
+## Install Dependencies
 
 ```r
-install.packages(c("readxl", "janitor", "tidyverse", "jsonlite"))
+install.packages(c(
+  "readxl",
+  "janitor",
+  "tidyverse",
+  "jsonlite"
+))
 ```
 
-If the project uses renv:
+or
 
 ```r
 renv::restore()
 ```
 
-### Run the globe locally
+---
 
-The site loads JSON and GeoJSON with `fetch()`, so opening `index.html` directly as a `file://` URL will fail — browsers block local fetches over that protocol. Run a local server instead:
+## Generate Processed Data
+
+Open:
+
+```
+scripts/preprocessing.Rmd
+```
+
+Run all chunks to regenerate the processed datasets.
+
+---
+
+## Run Locally
 
 ```bash
-# Python
 cd web
 python -m http.server 8080
-# open http://localhost:8080
+```
 
-# Node
+or
+
+```bash
 npx serve web
 ```
 
-### Deploy to Vercel
+---
 
-```bash
-npm install -g vercel
-vercel
-```
-
-Or connect the repo on the Vercel dashboard — it picks up `vercel.json` automatically and serves the `web/` folder.
-
-### Run the original Shiny app
+## Run the Original Shiny Version
 
 ```r
 shiny::runApp("shiny/app.R")
@@ -157,15 +276,39 @@ shiny::runApp("shiny/app.R")
 
 ---
 
-## Tech stack
+## Deploy
 
-| | |
-|---|---|
-| Data extraction & cleaning | R : `readxl`, `janitor` |
-| Transformation & feature engineering | R :`tidyverse` (dplyr, tidyr) |
-| JSON output | R : `jsonlite` |
-| Exploratory analysis | R :`ggplot2`, `dplyr` |
-| 3D globe | globe.gl v2.41.4 |
-| Color scales | D3 v7 |
-| Original app | R Shiny + htmlwidgets |
-| Deployment | Vercel |
+Deploy directly to **Vercel**:
+
+```bash
+vercel
+```
+
+or connect the repository through the Vercel dashboard.
+
+---
+
+# Technology Stack
+
+| Category             | Technologies              |
+| -------------------- | ------------------------- |
+| Language             | R, JavaScript             |
+| Data Processing      | tidyverse, dplyr, tidyr   |
+| Data Cleaning        | readxl, janitor           |
+| JSON Generation      | jsonlite                  |
+| Exploratory Analysis | ggplot2                   |
+| Geospatial Data      | GeoJSON, Natural Earth    |
+| Visualization        | globe.gl, Three.js, D3.js |
+| Original Frontend    | R Shiny, htmlwidgets      |
+| Deployment           | Vercel                    |
+
+---
+
+# Key Highlights
+
+* End-to-end ETL pipeline from raw Excel files to optimized GeoJSON
+* Automated feature engineering for lag-based time series analysis
+* Dynamic regional normalization for meaningful visual comparisons
+* Geospatial data enrichment for client-side rendering
+* Interactive WebGL visualization using globe.gl
+* Static deployment architecture with no backend requirements
