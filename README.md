@@ -8,9 +8,9 @@ An end-to-end data project tracking solar and wind energy capacity growth across
 
 The globe colors every country based on three metrics you can switch between:
 
-- **Total installed capacity (MW)** — how much solar or wind a country has built in a given year
-- **Year-over-year % growth** — how fast it's growing relative to its own prior year
-- **Net MW change** — raw capacity added or removed vs. the previous year
+- **Total installed capacity (MW)** : how much solar or wind a country has built in a given year
+- **Year-over-year % growth**: how fast it's growing relative to its own prior year
+- **Net MW change**: raw capacity added or removed vs. the previous year
 
 Alongside the visualization, I modeled growth trends using lag-based time series analysis — computing absolute and percentage change for each country across every year — and used regional max aggregations to build a dynamic color scale that recalibrates when you switch between worldwide and regional views. The regional scaling was a direct result of the EDA finding that Africa and South America are nearly invisible on a global scale despite meaningful growth rates.
 
@@ -161,10 +161,10 @@ shiny::runApp("shiny/app.R")
 
 | | |
 |---|---|
-| Data extraction & cleaning | R — `readxl`, `janitor` |
-| Transformation & feature engineering | R — `tidyverse` (dplyr, tidyr) |
-| JSON output | R — `jsonlite` |
-| Exploratory analysis | R — `ggplot2`, `dplyr` |
+| Data extraction & cleaning | R : `readxl`, `janitor` |
+| Transformation & feature engineering | R :`tidyverse` (dplyr, tidyr) |
+| JSON output | R : `jsonlite` |
+| Exploratory analysis | R :`ggplot2`, `dplyr` |
 | 3D globe | globe.gl v2.41.4 |
 | Color scales | D3 v7 |
 | Original app | R Shiny + htmlwidgets |
