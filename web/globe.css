@@ -19,7 +19,7 @@ html, body {
   z-index: 10;
   padding: 16px 14px;
   background-color: rgba(18, 18, 28, 0.96);
-  border-right: 1px solid rgba(26, 179, 148, 0.3);
+  border-right: 1px solid rgba(255, 255, 255, 0.15);
   overflow-y: auto;
   box-sizing: border-box;
   backdrop-filter: blur(8px);
@@ -31,18 +31,18 @@ html, body {
   display: block;
   font-size: 22px;
   font-weight: 700;
-  color: #1ab394;
+  color: #ffffff;
   text-align: center;
   margin-bottom: 18px;
   padding-bottom: 12px;
-  border-bottom: 2px solid #1ab394;
+  border-bottom: 2px solid rgba(255,255,255,0.3);
   letter-spacing: 1px;
 }
 
 /* Scrollbar */
 #sidebar-panel::-webkit-scrollbar { width: 4px; }
 #sidebar-panel::-webkit-scrollbar-track { background: transparent; }
-#sidebar-panel::-webkit-scrollbar-thumb { background: #1ab394; border-radius: 4px; }
+#sidebar-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.4); border-radius: 4px; }
 
 /* Section spacing */
 .sidebar-section {
@@ -54,7 +54,7 @@ html, body {
   display: block;
   font-size: 11px;
   font-weight: 700;
-  color: #1ab394;
+  color: #ffffff;
   text-transform: uppercase;
   letter-spacing: 0.8px;
   margin-bottom: 6px;
@@ -66,21 +66,21 @@ html, body {
   padding: 7px 10px;
   background-color: rgba(26, 27, 38, 0.9);
   color: #ffffff;
-  border: 1px solid rgba(26, 179, 148, 0.4);
+  border: 1px solid rgba(255,255,255,0.2);
   border-radius: 6px;
   font-family: 'Roboto', sans-serif;
   font-size: 13px;
   cursor: pointer;
   appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%231ab394'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23aaaaaa'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 10px center;
   padding-right: 28px;
 }
 .ctrl-select:focus {
   outline: none;
-  border-color: #1ab394;
-  box-shadow: 0 0 0 2px rgba(26, 179, 148, 0.2);
+  border-color: #ffffff;
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.1);
 }
 .ctrl-select option {
   background-color: #1a1b26;
@@ -91,8 +91,8 @@ html, body {
 .ctrl-btn {
   padding: 7px 10px;
   background-color: transparent;
-  color: #1ab394;
-  border: 1px solid rgba(26, 179, 148, 0.5);
+  color: #ffffff;
+  border: 1px solid rgba(255,255,255,0.25);
   border-radius: 6px;
   font-family: 'Roboto', sans-serif;
   font-size: 13px;
@@ -100,8 +100,8 @@ html, body {
   transition: background-color 0.2s ease, color 0.2s ease;
 }
 .ctrl-btn:hover {
-  background-color: #1ab394;
-  color: #121212;
+  background-color: rgba(255,255,255,0.15);
+  color: #ffffff;
 }
 .ctrl-btn.full { width: 100%; }
 .btn-row {
@@ -122,7 +122,7 @@ html, body {
 }
 .ctrl-checkbox input[type="checkbox"] {
   margin-top: 2px;
-  accent-color: #1ab394;
+  accent-color: #ffffff;
   cursor: pointer;
   flex-shrink: 0;
 }
@@ -163,7 +163,7 @@ html, body {
   background-color: rgba(26, 27, 38, 0.85);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
   backdrop-filter: blur(5px);
-  border-left: 4px solid #1ab394;
+  border-left: 4px solid rgba(255,255,255,0.4);
   transition: background-color 0.3s ease;
 }
 #regionYearDiv:hover {
@@ -176,7 +176,7 @@ html, body {
 }
 .regionYearTitle {
   font-weight: bold;
-  color: #1ab394;
+  color: #ffffff;
   margin-right: 8px;
 }
 .regionYearValue {
@@ -200,7 +200,7 @@ html, body {
 }
 
 #showtoggle {
-  background-color: #1ab394;
+  background-color: rgba(50, 50, 65, 0.95);
   color: #ffffff;
   border-radius: 10px 10px 0 0;
   padding: 10px 15px;
@@ -216,7 +216,7 @@ html, body {
   box-shadow: -2px -2px 10px rgba(0, 0, 0, 0.2);
 }
 #showtoggle:hover {
-  background-color: #16957c;
+  background-color: rgba(255,255,255,0.25);
 }
 
 #fpcontent {
@@ -231,12 +231,12 @@ html, body {
   line-height: 1.5;
   overflow-y: auto;
   transition: width 0.5s ease-in-out, opacity 0.3s ease;
-  border-left: 4px solid #1ab394;
+  border-left: 4px solid rgba(255,255,255,0.4);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
   backdrop-filter: blur(5px);
 }
 #fpcontent h3 {
-  color: #1ab394;
+  color: #ffffff;
   font-weight: 500;
   margin-top: 5px;
 }
@@ -245,8 +245,8 @@ html, body {
 }
 #fpcontent::-webkit-scrollbar       { width: 8px; }
 #fpcontent::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); border-radius: 10px; }
-#fpcontent::-webkit-scrollbar-thumb { background-color: #1ab394; border-radius: 10px; }
-#fpcontent::-webkit-scrollbar-thumb:hover { background-color: #16957c; }
+#fpcontent::-webkit-scrollbar-thumb { background-color: #ffffff; border-radius: 10px; }
+#fpcontent::-webkit-scrollbar-thumb:hover { background-color: rgba(255,255,255,0.25); }
 
 .closed { width: 0;     padding: 0;      opacity: 0; }
 .open   { width: 400px; padding: 20px;   opacity: 1; }
@@ -254,12 +254,12 @@ html, body {
 /* ── GLOBE TOOLTIP ────────────────────────────────────────────── */
 .scene-tooltip {
   background-color: rgba(26, 27, 38, 0.9) !important;
-  border-left: 3px solid #1ab394 !important;
+  border-left: 3px solid rgba(255,255,255,0.4) !important;
   color: white !important;
   font-family: 'Roboto', sans-serif !important;
   padding: 10px !important;
   border-radius: 6px !important;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5) !important;
 }
-.scene-tooltip b  { color: #1ab394; }
-.scene-tooltip hr { border-color: rgba(26, 179, 148, 0.3); margin: 8px 0; }
+.scene-tooltip b  { color: #ffffff; }
+.scene-tooltip hr { border-color: rgba(255,255,255,0.15); margin: 8px 0; 
